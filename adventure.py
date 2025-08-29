@@ -1,7 +1,9 @@
+import random
+
 inventory = ["Sword", "Gun", "Rope"]
 
 chest = ["iron", "copper", "silver"]
-trap_chest = 3
+trap_chest = random.randint(1, 3)
 room = {
     "hall": ["key", "map"],
     "kitchen": ["apple", "knife"],
@@ -16,11 +18,11 @@ print("Where do you want to go? \n 1.Hall \n 2.Kitchen \n 3.Bedroom")
 for item in chest:
     inventory.append(item)
 
+print("You found items:", chest)
 print("Inventory: ", inventory)
 
 for _ in range(trap_chest):
     if inventory:
         inventory.pop()
-print("It was a trap chest you lost 3 items!")
-
+print(f"It was a trap chest you lost {trap_chest} items!")
 print("Inventory:", inventory)
