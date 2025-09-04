@@ -47,12 +47,13 @@ class Player:
         self.show_inventory()
 
 class Room:
-    def __init__(self, name, items, locked=False, required_key=None, chest=None):
+    def __init__(self, name, items, locked=False, required_key=None, chest=None, exits=None):
         self.name = name
         self.items = items
         self.locked = locked
         self.required_key = required_key
         self.chest = chest
+        self.exits = exits or {}
 
     def get_items(self):
         return self.items.copy()
@@ -63,6 +64,10 @@ class Room:
             print(f"Items in this room: {self.items}")
         else:
             print("No items in this room.")
+        if self.exits:
+            print("Exits:")
+            for exit_name, room_name in self.exits.items():
+                print(f" - {exit_name} -> {room_name}")
 
     def offer_pickup(self, player):
         if not self.items:
@@ -123,55 +128,78 @@ class Game:
     def setup_game(self):
         chest1 = Chest(["iron", "copper"], is_trap=random.choice([True, False]))
         chest2 = Chest(["silver"], is_trap=random.choice([True, False]))
+        treasure_chest = Chest(["gold", "emerald"], is_trap=False)
+
+        # Rooms are created first without exits, then exits are wired up below
         self.rooms = {
             "hall": Room("hall", [KEY_NAME, "map"], locked=False, chest=None),
             "kitchen": Room("kitchen", ["apple", "knife"], locked=False, chest=chest1),
-            "bedroom": Room("bedroom", ["potion"], locked=True, required_key=KEY_NAME, chest=chest2)
+            "bedroom": Room("bedroom", ["potion"], locked=False, chest=chest2),
+            # Goal room: reaching here wins; it's locked and needs the key
+            "treasure": Room("treasure room", [], locked=True, required_key=KEY_NAME, chest=treasure_chest)
         }
+
+        # Wire up exits (direction labels are free-form for now)
+        self.rooms["hall"].exits = {"north": "kitchen", "east": "bedroom"}
+        self.rooms["kitchen"].exits = {"south": "hall"}
+        self.rooms["bedroom"].exits = {"west": "hall", "east": "treasure"}
+        self.rooms["treasure"].exits = {"west": "bedroom"}
 
         player_name = input("Enter your Character name: ")
         self.player = Player(player_name)
     
     def show_room_options(self):
         print("\nWhere do you want to go?")
-        room_names = list(self.rooms.keys())
-        for i, room_name in enumerate(room_names, 1):
+        current = self.rooms[self.player.current_room]
+        exits = list(current.exits.items())
+        for i, (exit_name, room_name) in enumerate(exits, 1):
             room = self.rooms[room_name]
-            if room.locked and room.required_key and room.required_key not in self.player.inventory:
-                print(f" {i}. {room_name} (locked)")
-            else:
-                print(f" {i}. {room_name}")
+            locked_label = " (locked)" if room.locked and room.required_key and room.required_key not in self.player.inventory else ""
+            print(f" {i}. {exit_name} -> {room_name}{locked_label}")
+        print(" i. inventory   s. status   q. quit")
 
     def handle_room_movement(self):
         self.show_room_options()
+        choice = input("Enter your choice: ").strip().lower()
+        if choice == "i":
+            self.player.show_inventory()
+            return
+        if choice == "s":
+            self.player.show_status()
+            return
+        if choice == "q":
+            raise SystemExit("You quit the adventure.")
         try:
-            choice = int(input("Enter your choice (1-3): "))
-            room_names = list(self.rooms.keys())
-            if 1 <= choice <= len(room_names):
-                selected_room = room_names[choice - 1]
-                room = self.rooms[selected_room]
-                if room.locked and room.required_key and room.required_key not in self.player.inventory:
-                    print(f"The {selected_room} is locked. You need a {room.required_key}.")
-                else:
-                    if room.locked and room.required_key in self.player.inventory:
-                        print(f"You use the {room.required_key} to unlock the {selected_room}.")
-                        room.locked = False
-                    self.player.move_to_room(selected_room)
-                    room.show_description()
-                    room.offer_pickup(self.player)
-                    room.offer_open_chest(self.player)
-            else:
-                print("Invalid choice. Staying in the current room.")
+            choice_num = int(choice)
         except ValueError:
-            print("Invalid input. Please enter a number.")
+            print("Invalid input. Enter a number or a command.")
+            return
+        current = self.rooms[self.player.current_room]
+        exits = list(current.exits.items())
+        if not (1 <= choice_num <= len(exits)):
+            print("Invalid choice. Staying in the current room.")
+            return
+        _, selected_room = exits[choice_num - 1]
+        room = self.rooms[selected_room]
+        if room.locked and room.required_key and room.required_key not in self.player.inventory:
+            print(f"The {selected_room} is locked. You need a {room.required_key}.")
+            return
+        if room.locked and room.required_key in self.player.inventory:
+            print(f"You use the {room.required_key} to unlock the {selected_room}.")
+            room.locked = False
+        self.player.move_to_room(selected_room)
+        room.show_description()
+        room.offer_pickup(self.player)
+        room.offer_open_chest(self.player)
 
     def run(self):
         print("Welcome to the Adventure Game!")
+        print("Goal: Find your way to the treasure room.")
         self.player.show_status()
         self.rooms[self.player.current_room].show_description()
-        self.handle_room_movement()
-
-        print("\n=== GAME COMPLETED ===")
+        while self.player.current_room != "treasure":
+            self.handle_room_movement()
+        print("\n=== YOU REACHED THE TREASURE ROOM! YOU WIN! ===")
         self.player.show_status()
     
 
