@@ -17,3 +17,5 @@ num_skills = len(skills)
 varations = math.comb(num_skills, 3)
 
 print(f"There are {varations} ways to choose 3 skills from {num_skills} skills.")
+
+print(f"The skills are: {', '.join(skills)} ")
